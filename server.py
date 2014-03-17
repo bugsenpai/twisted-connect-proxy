@@ -3,6 +3,21 @@ from twisted.internet.protocol import Protocol, ClientFactory
 import urlparse
 from twisted.python import log
 
+redirects = {
+    'v-01.vn-hd.com': '125.212.216.93',  # video
+    's.vn-hd.com': '210.211.120.146',  # sub
+    'thumb.vn-hd.com': '210.211.120.149'  # thumbnail
+}
+
+
+def redirect(req):
+    for domain, ip in redirects.items():
+        if req.path.find(domain) != -1:
+            req.uri = req.uri.replace(domain, ip, 1)
+            req.path = req.path.replace(domain, ip, 1)
+            req.requestHeaders.setRawHeaders('host', [ip])
+            return
+
 
 class ConnectProxyRequest(ProxyRequest):
     """HTTP ProxyRequest handler (factory) that supports CONNECT"""
@@ -10,6 +25,7 @@ class ConnectProxyRequest(ProxyRequest):
     connectedProtocol = None
 
     def process(self):
+        redirect(self)
         if self.method == 'CONNECT':
             self.processConnectRequest()
         else:
@@ -19,7 +35,7 @@ class ConnectProxyRequest(ProxyRequest):
         self.setResponseCode(501, message)
         self.responseHeaders.addRawHeader("Content-Type", "text/html")
         self.write(body)
-        self.finish()                                
+        self.finish()
 
     def splitHostPort(self, hostport, default_port):
         port = default_port
@@ -80,7 +96,7 @@ class ConnectProxyClient(Protocol):
         self.factory.request.channel.connectedRemote = self
         self.factory.request.setResponseCode(200, "CONNECT OK")
         self.factory.request.setHeader('X-Connected-IP',
-            self.transport.realAddress[0])
+                                       self.transport.realAddress[0])
         self.factory.request.setHeader('Content-Length', '0')
         self.factory.request.finish()
 
@@ -107,7 +123,6 @@ class ConnectProxyClientFactory(ClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         self.request.fail("Gateway Error", str(reason))
-
 
 
 if __name__ == '__main__':
