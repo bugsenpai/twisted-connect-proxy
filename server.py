@@ -1,12 +1,13 @@
 from twisted.web.proxy import Proxy, ProxyRequest
 from twisted.internet.protocol import Protocol, ClientFactory
 import urlparse
+import urllib
 from twisted.python import log
 
+sub_server = 's.vn-hd.com'
+remote_server = 'hdviet-proxy.appspot.com'
 redirects = {
     'v-01.vn-hd.com': '125.212.216.93',  # video
-    's.vn-hd.com': '210.211.120.146',  # sub
-    'thumb.vn-hd.com': '210.211.120.149'  # thumbnail
 }
 
 
@@ -16,6 +17,14 @@ def redirect(req):
             req.uri = req.uri.replace(domain, ip, 1)
             req.path = req.path.replace(domain, ip, 1)
             req.requestHeaders.setRawHeaders('host', [ip])
+            return
+        elif req.path.find(sub_server) != -1:
+            proxied_url = 'http://%s/?%s' % (remote_server,
+                                             urllib.urlencode({'url': req.uri})
+                                             )
+            req.uri = proxied_url
+            req.path = req.path.replace(sub_server, remote_server)
+            req.requestHeaders.setRawHeaders('host', [remote_server])
             return
 
 
